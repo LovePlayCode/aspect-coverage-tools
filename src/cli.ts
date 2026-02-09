@@ -6,9 +6,12 @@
 
 import { loadConfig } from './config';
 import { run, parseMode } from './runner';
-import type { RunMode } from './types';
+import { getReporter } from './reporters/index';
+import { CliError, isCoverageToolError } from './errors/index';
+import type { RunMode, ReporterFunction } from './types';
+import { AVAILABLE_PRESETS, AVAILABLE_REPORTERS } from './types';
 
-const VERSION = '1.0.0';
+const VERSION = '2.0.0';
 
 const HELP_TEXT = `
 📊 @aspect/coverage-tools - 增量覆盖率检测工具
@@ -23,8 +26,8 @@ const HELP_TEXT = `
   --pr                      强制 PR 模式
 
 选项:
-  --preset <name>           使用预设配置 (vue, react, miniprogram, default)
-  --reporter <name>         指定报告器 (console, cnb, github-actions)
+  --preset <name>           使用预设配置 (${AVAILABLE_PRESETS.join(', ')})
+  --reporter <name>         指定报告器 (${AVAILABLE_REPORTERS.join(', ')})
   --config <path>           指定配置文件路径
   --strict                  严格模式，低于阈值时退出码为 1
   --help, -h                显示帮助信息
@@ -102,15 +105,36 @@ function parseArgs(args: string[]): {
       case '--strict':
         result.strict = true;
         break;
-      case '--preset':
-        result.preset = args[++i];
+      case '--preset': {
+        const value = args[++i];
+        if (!value || value.startsWith('-')) {
+          throw CliError.missingValue('--preset');
+        }
+        if (!AVAILABLE_PRESETS.includes(value as typeof AVAILABLE_PRESETS[number])) {
+          throw CliError.invalidArgument('--preset', value, [...AVAILABLE_PRESETS]);
+        }
+        result.preset = value;
         break;
-      case '--reporter':
-        result.reporter = args[++i];
+      }
+      case '--reporter': {
+        const value = args[++i];
+        if (!value || value.startsWith('-')) {
+          throw CliError.missingValue('--reporter');
+        }
+        if (!AVAILABLE_REPORTERS.includes(value as typeof AVAILABLE_REPORTERS[number])) {
+          throw CliError.invalidArgument('--reporter', value, [...AVAILABLE_REPORTERS]);
+        }
+        result.reporter = value;
         break;
-      case '--config':
-        result.config = args[++i];
+      }
+      case '--config': {
+        const value = args[++i];
+        if (!value || value.startsWith('-')) {
+          throw CliError.missingValue('--config');
+        }
+        result.config = value;
         break;
+      }
     }
   }
 
@@ -122,21 +146,22 @@ function parseArgs(args: string[]): {
  */
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  const parsedArgs = parseArgs(args);
-
-  // 显示帮助
-  if (parsedArgs.help) {
-    console.log(HELP_TEXT);
-    process.exit(0);
-  }
-
-  // 显示版本
-  if (parsedArgs.version) {
-    console.log(`@aspect/coverage-tools v${VERSION}`);
-    process.exit(0);
-  }
 
   try {
+    const parsedArgs = parseArgs(args);
+
+    // 显示帮助
+    if (parsedArgs.help) {
+      console.log(HELP_TEXT);
+      process.exit(0);
+    }
+
+    // 显示版本
+    if (parsedArgs.version) {
+      console.log(`@aspect/coverage-tools v${VERSION}`);
+      process.exit(0);
+    }
+
     // 加载配置
     const config = await loadConfig(parsedArgs.config);
 
@@ -153,9 +178,33 @@ async function main(): Promise<void> {
 
     // 运行检测
     const mode = parsedArgs.mode || parseMode(args);
-    await run({ mode, config });
+    const result = await run({ mode, config });
+
+    // 获取报告器并输出结果
+    let reporter: ReporterFunction;
+    if (typeof config.reporter === 'function') {
+      reporter = config.reporter;
+    } else {
+      reporter = getReporter(config.reporter);
+    }
+
+    reporter(result);
+
+    // 根据结果决定退出码
+    if (!result.success && config.strictMode) {
+      process.exit(1);
+    }
+
+    process.exit(0);
   } catch (error) {
-    console.error('❌ 运行出错:', error);
+    if (isCoverageToolError(error)) {
+      console.error(`❌ ${error.message}`);
+      if (error.context) {
+        console.error('   上下文:', JSON.stringify(error.context, null, 2));
+      }
+    } else {
+      console.error('❌ 运行出错:', error);
+    }
     process.exit(1);
   }
 }

@@ -3,7 +3,7 @@
  * 提供控制台输出的核心逻辑，其他报告器可以继承使用
  */
 
-import type { ReporterOptions, FileResult, ThresholdCheckResult } from '../types';
+import type { ReporterOptions, FileResult, ThresholdCheckResult, RunContext, FileCoverage } from '../types';
 
 /**
  * 格式化百分比值
@@ -30,6 +30,30 @@ export function getModeText(mode: string): string {
  */
 export function printDivider(char: string = '=', length: number = 70): void {
   console.log(char.repeat(length));
+}
+
+/**
+ * 打印运行上下文信息
+ */
+export function printRunContext(context: RunContext): void {
+  console.log('\n🔍 增量覆盖率检测');
+  console.log(`   模式: ${getModeText(context.mode)}`);
+  console.log(`   分支: ${context.currentBranch}`);
+
+  if (context.mode !== 'staged') {
+    console.log(`   Commit: ${context.currentCommit.substring(0, 8)}`);
+  }
+
+  if (context.isPr) {
+    console.log(`   目标分支: ${context.targetBranch}`);
+    if (context.prNumber) {
+      console.log(`   PR: #${context.prNumber}`);
+    }
+  }
+
+  if (context.isCi) {
+    console.log(`   CI 平台: ${context.ciAdapter}`);
+  }
 }
 
 /**
@@ -85,12 +109,7 @@ export function printFileDetails(files: FileResult[], lineThreshold: number): vo
 /**
  * 打印覆盖率汇总
  */
-export function printSummary(summary: {
-  lines: { pct: number; covered: number; total: number };
-  statements: { pct: number; covered: number; total: number };
-  branches: { pct: number; covered: number; total: number };
-  functions: { pct: number; covered: number; total: number };
-}): void {
+export function printSummary(summary: FileCoverage): void {
   console.log('\n📊 覆盖率汇总:');
   console.log(`  📏 行覆盖率:   ${summary.lines.pct}% (${summary.lines.covered}/${summary.lines.total})`);
   console.log(`  📝 语句覆盖率: ${summary.statements.pct}% (${summary.statements.covered}/${summary.statements.total})`);
@@ -113,11 +132,7 @@ export function printThresholdCheck(thresholdResult: ThresholdCheckResult): void
 /**
  * 打印全量覆盖率（参考）
  */
-export function printTotalCoverage(total: {
-  lines: { pct: number; covered: number; total: number };
-  branches: { pct: number; covered: number; total: number };
-  functions: { pct: number; covered: number; total: number };
-} | null): void {
+export function printTotalCoverage(total: FileCoverage | null): void {
   if (total) {
     console.log('\n📈 全量覆盖率（整个项目，仅供参考）');
     printDivider('-');
@@ -149,11 +164,21 @@ export function printFinalResult(passed: boolean, strictMode: boolean): void {
  * 控制台报告器 - 基础实现
  */
 export function consoleReporter(options: ReporterOptions): boolean {
-  const { mode, changedFiles, incremental, total, thresholdResult, config } = options;
+  const { context, changedFiles, incremental, total, thresholdResult, config } = options;
 
   console.log('\n📊 增量覆盖率报告');
   printDivider();
-  console.log(`   模式: ${getModeText(mode)}`);
+
+  // 打印运行上下文
+  printRunContext(context);
+
+  // 无变更文件
+  if (changedFiles.length === 0) {
+    console.log('\n✅ 没有需要检测覆盖率的源代码变更\n');
+    return true;
+  }
+
+  console.log(`\n📁 变更文件: ${changedFiles.length} 个`);
 
   console.log('\n📈 本次提交覆盖率');
   printDivider('-');

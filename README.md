@@ -9,6 +9,8 @@
 - 📊 **多平台报告**: 支持 CNB、GitHub Actions、Console 等多种报告器
 - 🔧 **高度可配置**: 支持配置文件和环境变量
 - 📝 **TypeScript**: 完整的类型定义
+- 🛡️ **统一错误处理**: 结构化的错误类型，便于程序化处理
+- 🔌 **CI 平台适配**: 自动检测 CI 环境，支持多平台
 
 ## 安装
 
@@ -55,11 +57,45 @@ export default {
 ```typescript
 import { runCoverageCheck, presets } from '@aspect/coverage-tools';
 
-await runCoverageCheck({
+// v2.0 返回结构化的 RunResult 对象
+const result = await runCoverageCheck({
   ...presets.vue,
   reporter: 'cnb',
   thresholds: { lines: 80 },
 });
+
+console.log(result.success); // true or false
+console.log(result.incremental.summary.lines.pct); // 覆盖率百分比
+console.log(result.thresholdResult.details); // 各指标检查详情
+```
+
+## v2.0 Breaking Changes
+
+### `run()` 返回类型变更
+
+v1.x:
+```typescript
+const passed: boolean = await run({ config });
+```
+
+v2.0:
+```typescript
+const result: RunResult = await run({ config });
+// result.success 等价于之前的 passed
+```
+
+### `RunResult` 结构
+
+```typescript
+interface RunResult {
+  success: boolean;           // 是否满足所有阈值
+  context: RunContext;        // 运行上下文（模式、分支、CI 信息）
+  changedFiles: string[];     // 变更的文件列表
+  incremental: IncrementalResult;  // 增量覆盖率结果
+  total: FileCoverage | null;      // 全量覆盖率结果
+  thresholdResult: ThresholdCheckResult;  // 阈值检查结果
+  config: ResolvedConfig;     // 使用的配置
+}
 ```
 
 ## 预设配置
@@ -93,6 +129,61 @@ export default {
 - `console`: 纯控制台输出
 - `cnb`: CNB 平台（输出环境变量）
 - `github-actions`: GitHub Actions（输出 workflow 命令）
+
+## CI 平台支持
+
+工具会自动检测当前 CI 环境：
+
+- **CNB**: 通过 `CNB_COMMIT` 环境变量检测
+- **GitHub Actions**: 通过 `GITHUB_ACTIONS` 环境变量检测
+- **本地环境**: 无 CI 环境变量时使用本地适配器
+
+### 使用 CI 适配器
+
+```typescript
+import { getCiEnvironment, getActiveAdapter } from '@aspect/coverage-tools';
+
+// 获取当前 CI 环境信息
+const env = getCiEnvironment();
+console.log(env.isCi);       // 是否在 CI 环境
+console.log(env.isPr);       // 是否为 PR 场景
+console.log(env.branch);     // 当前分支
+console.log(env.adapterName); // 适配器名称
+
+// 使用适配器输出变量
+const adapter = getActiveAdapter();
+adapter.setOutput('COVERAGE_PCT', '80%');
+```
+
+## 错误处理
+
+v2.0 引入了统一的错误处理机制：
+
+```typescript
+import { 
+  runCoverageCheck, 
+  isCoverageToolError,
+  isLcovParseError 
+} from '@aspect/coverage-tools';
+
+try {
+  const result = await runCoverageCheck();
+} catch (error) {
+  if (isLcovParseError(error)) {
+    console.error('覆盖率文件解析失败:', error.context?.filePath);
+  } else if (isCoverageToolError(error)) {
+    console.error(`错误 [${error.code}]:`, error.message);
+  }
+}
+```
+
+### 错误类型
+
+- `CoverageToolError`: 基础错误类
+- `GitError`: Git 命令执行错误
+- `LcovParseError`: LCOV 文件解析错误
+- `ConfigError`: 配置加载/解析错误
+- `CliError`: CLI 参数错误
 
 ## 配置项
 

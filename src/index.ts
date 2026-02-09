@@ -20,6 +20,7 @@ export type {
   // 运行时类型
   RunMode,
   RunContext,
+  RunResult,
   // 报告器类型
   ThresholdCheckDetail,
   ThresholdCheckResult,
@@ -27,7 +28,42 @@ export type {
   ReporterFunction,
   // CLI 类型
   CliOptions,
+  PresetName,
+  ReporterName,
 } from './types';
+
+// 常量导出
+export { AVAILABLE_PRESETS, AVAILABLE_REPORTERS } from './types';
+
+// 错误类型导出
+export {
+  CoverageToolError,
+  GitError,
+  LcovParseError,
+  ConfigError,
+  CliError,
+  ErrorCodes,
+  isCoverageToolError,
+  isGitError,
+  isLcovParseError,
+  isConfigError,
+  isCliError,
+} from './errors/index';
+
+export type { ErrorCode } from './errors/index';
+
+// CI 适配器导出
+export type { CiAdapter, CiEnvironment } from './ci-adapter/types';
+
+export {
+  cnbAdapter,
+  githubActionsAdapter,
+  localAdapter,
+  detectCiAdapter,
+  getActiveAdapter,
+  getCiEnvironment,
+  isCiEnvironment,
+} from './ci-adapter/index';
 
 // Core 模块
 export {
@@ -93,14 +129,17 @@ export type { RunOptions } from './runner';
  * ```typescript
  * import { runCoverageCheck, presets } from '@aspect/coverage-tools';
  *
- * await runCoverageCheck({
+ * const result = await runCoverageCheck({
  *   ...presets.vue,
  *   reporter: 'cnb',
  *   thresholds: { lines: 80 }
  * });
+ *
+ * console.log(result.success); // true or false
+ * console.log(result.incremental.summary.lines.pct); // 覆盖率百分比
  * ```
  */
-export async function runCoverageCheck(config?: CoverageConfig): Promise<boolean> {
+export async function runCoverageCheck(config?: CoverageConfig): Promise<RunResult> {
   const { loadConfig } = await import('./config');
   const { run } = await import('./runner');
 
@@ -119,4 +158,4 @@ export async function runCoverageCheck(config?: CoverageConfig): Promise<boolean
 }
 
 // 导入类型用于 runCoverageCheck
-import type { CoverageConfig } from './types';
+import type { CoverageConfig, RunResult } from './types';

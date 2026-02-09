@@ -4,64 +4,58 @@
  */
 
 import type { ReporterOptions } from '../types';
-import { consoleReporter } from './console';
+import { consoleReporter, formatPct } from './console';
+import { githubActionsAdapter } from '../ci-adapter/github-actions';
 
 /**
- * 格式化百分比值（GitHub Actions 格式）
- */
-function formatGhaPct(value: number | undefined | null): string {
-  return value !== undefined && value !== null ? `${value}%` : 'N/A';
-}
-
-/**
- * 输出 GitHub Actions 环境变量
- * 使用 GITHUB_OUTPUT 文件方式（推荐）
+ * 输出 GitHub Actions 环境变量（使用适配器）
  */
 function outputGhaVariables(options: ReporterOptions): void {
-  const { incremental, total, thresholdResult } = options;
+  const { incremental, total, thresholdResult, changedFiles } = options;
   const summary = incremental.summary;
+  const adapter = githubActionsAdapter;
 
-  // 使用 echo 方式输出到 GITHUB_OUTPUT（新版语法）
-  const outputFile = process.env.GITHUB_OUTPUT;
+  // 无变更文件时输出默认值
+  if (changedFiles.length === 0) {
+    adapter.setOutput('incr_lines_pct', '100%');
+    adapter.setOutput('incr_statements_pct', '100%');
+    adapter.setOutput('incr_branches_pct', '100%');
+    adapter.setOutput('incr_functions_pct', '100%');
+    adapter.setOutput('incr_lines_covered', '0');
+    adapter.setOutput('incr_lines_total', '0');
+    adapter.setOutput('incr_files_total', '0');
+    adapter.setOutput('incr_files_covered', '0');
+    adapter.setOutput('passed', 'true');
+    return;
+  }
 
-  if (outputFile) {
-    // 新版 GitHub Actions 语法
-    const fs = require('node:fs');
+  // 增量覆盖率变量
+  adapter.setOutput('incr_lines_pct', formatPct(summary.lines.pct));
+  adapter.setOutput('incr_statements_pct', formatPct(summary.statements.pct));
+  adapter.setOutput('incr_branches_pct', formatPct(summary.branches.pct));
+  adapter.setOutput('incr_functions_pct', formatPct(summary.functions.pct));
+  adapter.setOutput('incr_lines_covered', String(summary.lines.covered));
+  adapter.setOutput('incr_lines_total', String(summary.lines.total));
 
-    const outputs = [
-      `incr_lines_pct=${formatGhaPct(summary.lines.pct)}`,
-      `incr_statements_pct=${formatGhaPct(summary.statements.pct)}`,
-      `incr_branches_pct=${formatGhaPct(summary.branches.pct)}`,
-      `incr_functions_pct=${formatGhaPct(summary.functions.pct)}`,
-      `incr_lines_covered=${summary.lines.covered}`,
-      `incr_lines_total=${summary.lines.total}`,
-      `incr_files_total=${incremental.files.length}`,
-      `incr_files_covered=${incremental.files.filter((f) => f.hasCoverage && f.lines.pct > 0).length}`,
-      `passed=${thresholdResult.passed}`,
-    ];
+  // 文件统计
+  const filesTotal = incremental.files.length;
+  const filesCovered = incremental.files.filter((f) => f.hasCoverage && f.lines.pct > 0).length;
+  adapter.setOutput('incr_files_total', String(filesTotal));
+  adapter.setOutput('incr_files_covered', String(filesCovered));
+  adapter.setOutput('passed', String(thresholdResult.passed));
 
-    if (total) {
-      outputs.push(
-        `total_lines_pct=${formatGhaPct(total.lines.pct)}`,
-        `total_branches_pct=${formatGhaPct(total.branches.pct)}`,
-        `total_functions_pct=${formatGhaPct(total.functions.pct)}`
-      );
-    }
-
-    fs.appendFileSync(outputFile, outputs.join('\n') + '\n');
-  } else {
-    // 兼容旧版语法（::set-output）
-    console.log(`::set-output name=incr_lines_pct::${formatGhaPct(summary.lines.pct)}`);
-    console.log(`::set-output name=incr_branches_pct::${formatGhaPct(summary.branches.pct)}`);
-    console.log(`::set-output name=incr_functions_pct::${formatGhaPct(summary.functions.pct)}`);
-    console.log(`::set-output name=passed::${thresholdResult.passed}`);
+  // 全量覆盖率变量
+  if (total) {
+    adapter.setOutput('total_lines_pct', formatPct(total.lines.pct));
+    adapter.setOutput('total_branches_pct', formatPct(total.branches.pct));
+    adapter.setOutput('total_functions_pct', formatPct(total.functions.pct));
   }
 
   // 如果未通过，输出警告
   if (!thresholdResult.passed) {
     for (const detail of thresholdResult.details) {
       if (!detail.passed) {
-        console.log(`::warning::${detail.name}未达标: ${detail.actual}% < ${detail.threshold}%`);
+        adapter.setWarning(`${detail.name}未达标: ${detail.actual}% < ${detail.threshold}%`);
       }
     }
   }

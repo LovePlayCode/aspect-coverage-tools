@@ -147,6 +147,7 @@ export function checkThresholds(
 
     results.details.push({
       name: check.name,
+      key: check.key,
       actual,
       threshold: check.threshold,
       passed,

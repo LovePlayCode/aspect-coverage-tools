@@ -34,22 +34,15 @@ export interface FileCoverage {
 
 /**
  * 文件覆盖率结果
+ * 继承 FileCoverage 减少字段重复
  */
-export interface FileResult {
+export interface FileResult extends FileCoverage {
   /** 文件路径 */
   file: string;
   /** 是否有覆盖率数据 */
   hasCoverage: boolean;
   /** 是否为纯类型文件 */
   isTypeOnly: boolean;
-  /** 行覆盖率 */
-  lines: CoverageMetric;
-  /** 语句覆盖率 */
-  statements: CoverageMetric;
-  /** 分支覆盖率 */
-  branches: CoverageMetric;
-  /** 函数覆盖率 */
-  functions: CoverageMetric;
 }
 
 /**
@@ -156,6 +149,35 @@ export interface RunContext {
   isPr: boolean;
   /** PR 目标分支 */
   targetBranch: string | null;
+  /** PR 编号 */
+  prNumber: string | null;
+  /** CI 适配器名称 */
+  ciAdapter: string;
+}
+
+// ============================================================
+// 运行结果类型
+// ============================================================
+
+/**
+ * 运行结果
+ * run() 函数的返回类型，包含完整的执行结果
+ */
+export interface RunResult {
+  /** 是否成功（满足所有阈值） */
+  success: boolean;
+  /** 运行上下文 */
+  context: RunContext;
+  /** 变更的文件列表 */
+  changedFiles: string[];
+  /** 增量覆盖率结果 */
+  incremental: IncrementalResult;
+  /** 全量覆盖率结果 */
+  total: FileCoverage | null;
+  /** 阈值检查结果 */
+  thresholdResult: ThresholdCheckResult;
+  /** 配置 */
+  config: ResolvedConfig;
 }
 
 // ============================================================
@@ -168,6 +190,8 @@ export interface RunContext {
 export interface ThresholdCheckDetail {
   /** 指标名称 */
   name: string;
+  /** 指标键名 */
+  key: 'lines' | 'branches' | 'functions' | 'statements';
   /** 实际值 */
   actual: number;
   /** 阈值 */
@@ -187,22 +211,9 @@ export interface ThresholdCheckResult {
 }
 
 /**
- * 报告器选项
+ * 报告器选项（使用 RunResult）
  */
-export interface ReporterOptions {
-  /** 运行模式 */
-  mode: RunMode;
-  /** 变更的文件列表 */
-  changedFiles: string[];
-  /** 增量覆盖率结果 */
-  incremental: IncrementalResult;
-  /** 全量覆盖率结果 */
-  total: FileCoverage | null;
-  /** 阈值检查结果 */
-  thresholdResult: ThresholdCheckResult;
-  /** 配置 */
-  config: ResolvedConfig;
-}
+export type ReporterOptions = RunResult;
 
 /**
  * 报告器函数类型
@@ -232,3 +243,15 @@ export interface CliOptions {
   /** 显示版本 */
   version?: boolean;
 }
+
+/**
+ * 可用的预设名称
+ */
+export const AVAILABLE_PRESETS = ['vue', 'react', 'miniprogram', 'default'] as const;
+export type PresetName = (typeof AVAILABLE_PRESETS)[number];
+
+/**
+ * 可用的报告器名称
+ */
+export const AVAILABLE_REPORTERS = ['console', 'cnb', 'github-actions'] as const;
+export type ReporterName = (typeof AVAILABLE_REPORTERS)[number];
