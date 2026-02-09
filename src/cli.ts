@@ -8,7 +8,7 @@ import { loadConfig } from './config';
 import { run, parseMode } from './runner';
 import { getReporter } from './reporters/index';
 import { CliError, isCoverageToolError } from './errors/index';
-import type { RunMode, ReporterFunction } from './types';
+import type { RunMode, ReporterFunction, CoverageConfig } from './types';
 import { AVAILABLE_PRESETS, AVAILABLE_REPORTERS } from './types';
 
 const VERSION = '2.0.0';
@@ -162,19 +162,20 @@ async function main(): Promise<void> {
       process.exit(0);
     }
 
-    // 加载配置
-    const config = await loadConfig(parsedArgs.config);
-
-    // 命令行参数覆盖配置
+    // 准备命令行覆盖参数
+    const cliOverrides: Partial<CoverageConfig> = {};
     if (parsedArgs.preset) {
-      config.preset = parsedArgs.preset;
+      cliOverrides.preset = parsedArgs.preset as CoverageConfig['preset'];
     }
     if (parsedArgs.reporter) {
-      config.reporter = parsedArgs.reporter;
+      cliOverrides.reporter = parsedArgs.reporter as CoverageConfig['reporter'];
     }
     if (parsedArgs.strict !== undefined) {
-      config.strictMode = parsedArgs.strict;
+      cliOverrides.strictMode = parsedArgs.strict;
     }
+
+    // 加载配置，命令行参数优先级最高
+    const config = await loadConfig(parsedArgs.config, cliOverrides);
 
     // 运行检测
     const mode = parsedArgs.mode || parseMode(args);

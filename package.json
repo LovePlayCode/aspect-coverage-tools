@@ -1,5 +1,5 @@
 {
-  "name": "@aspect/coverage-tools",
+  "name": "incremental-coverage-tools",
   "version": "2.0.0",
   "description": "增量覆盖率检测工具，支持 Vue、React、小程序等多种项目类型",
   "type": "module",

@@ -151,6 +151,7 @@ export function resolveConfig(config: CoverageConfig): ResolvedConfig {
  */
 export async function loadConfig(
   configPath?: string,
+  cliOverrides?: Partial<CoverageConfig>,
   cwd: string = process.cwd()
 ): Promise<ResolvedConfig> {
   let userConfig: CoverageConfig = {};
@@ -161,5 +162,11 @@ export async function loadConfig(
     userConfig = await loadConfigFile(filepath);
   }
 
-  return resolveConfig(userConfig);
+  // 合并命令行覆盖参数（CLI 参数优先级最高）
+  const finalConfig: CoverageConfig = {
+    ...userConfig,
+    ...cliOverrides,
+  };
+
+  return resolveConfig(finalConfig);
 }
