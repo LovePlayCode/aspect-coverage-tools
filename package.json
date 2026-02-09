@@ -1,0 +1,61 @@
+{
+  "name": "@aspect/coverage-tools",
+  "version": "1.0.0",
+  "description": "增量覆盖率检测工具，支持 Vue、React、小程序等多种项目类型",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    },
+    "./presets": {
+      "import": "./dist/presets/index.js",
+      "require": "./dist/presets/index.cjs",
+      "types": "./dist/presets/index.d.ts"
+    },
+    "./reporters": {
+      "import": "./dist/reporters/index.js",
+      "require": "./dist/reporters/index.cjs",
+      "types": "./dist/reporters/index.d.ts"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "coverage-check": "./bin/cli.js"
+  },
+  "files": [
+    "dist",
+    "bin"
+  ],
+  "scripts": {
+    "build": "rslib build",
+    "dev": "rslib build --watch",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "coverage",
+    "incremental",
+    "testing",
+    "lcov",
+    "ci",
+    "vue",
+    "react",
+    "miniprogram"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@rslib/core": "^0.3.1",
+    "@types/node": "^20.17.12",
+    "typescript": "^5.7.3"
+  },
+  "peerDependencies": {},
+  "dependencies": {}
+}
